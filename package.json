@@ -7,9 +7,14 @@
   "scripts": {
     "dev": "node esbuild.config.mjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
-    "typecheck": "tsc -noEmit -skipLibCheck"
+    "typecheck": "tsc -noEmit -skipLibCheck",
+    "test": "node scripts/run-tests.mjs"
   },
-  "keywords": ["obsidian", "translation", "bilingual"],
+  "keywords": [
+    "obsidian",
+    "translation",
+    "bilingual"
+  ],
   "license": "MIT",
   "devDependencies": {
     "@codemirror/state": "^6.5.0",
