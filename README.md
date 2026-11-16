@@ -12,7 +12,21 @@ and nothing appears in the file tree.
 
 ## Status
 
-Step 2 of 4: pairing and alignment tracking work; the visible highlight arrives in step 3.
+Step 3 of 4: pairing, alignment tracking and the Live Preview highlight work. Step 4
+(testing and polish) is next.
+
+## The highlight
+
+In Live Preview or source mode, when the cursor sits on a linked line, that line gets a
+soft tint and its partner in the other pane gets a slightly stronger one. The partner is
+scrolled into the middle of its pane only when it is off screen. It works in both
+directions: click into the other pane and the roles swap. While a Chinese (or any IME)
+candidate is being composed the highlight waits for the commit, so it does not flicker.
+Reading view is never touched. Tables and callouts that Live Preview draws as rendered
+blocks are highlighted as a block (or, for tables, the matching row).
+
+Colours follow the theme accent. To change them, add a CSS snippet that sets
+`--cat-hl-self`, `--cat-hl-partner` or `--cat-unpaired` on `body`.
 
 ## Using it
 
@@ -24,6 +38,7 @@ palette (Ctrl+P). Each can also be given a hotkey.
 | Pair this note with the note in the other pane | Links the two notes and pairs their units in order as a starting point. |
 | Unpair this note | Removes the pairing and its stored alignment. |
 | Link the current line with the cursor line in the paired note | Fixes a single correspondence by hand. |
+| Jump to the corresponding line in the paired note | Moves the cursor to the partner line, opening the partner in a split if needed. |
 | Show pairing status | Shows how many units are linked and how many are not. |
 
 While you write, the plugin compares each note with its last snapshot and carries every

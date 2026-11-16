@@ -77,7 +77,26 @@ const MAX_DP_CELLS = 4_000_000;
  * pairs in increasing order. Falls back to a greedy in-order match on very
  * large inputs to stay fast.
  */
-function lcsPairs(oldT: string[], newT: string[]): [number, number][] {
+function lcsPairs(oldAll: string[], newAll: string[]): [number, number][] {
+	// Trim the common prefix and suffix first: a typical edit touches one
+	// spot, so this keeps the expensive part tiny while typing.
+	let pre = 0;
+	while (pre < oldAll.length && pre < newAll.length && oldAll[pre] === newAll[pre]) pre++;
+	let suf = 0;
+	while (
+		suf < oldAll.length - pre &&
+		suf < newAll.length - pre &&
+		oldAll[oldAll.length - 1 - suf] === newAll[newAll.length - 1 - suf]
+	) suf++;
+	const head: [number, number][] = [];
+	for (let k = 0; k < pre; k++) head.push([k, k]);
+	const tail: [number, number][] = [];
+	for (let k = suf; k > 0; k--) tail.push([oldAll.length - k, newAll.length - k]);
+	const middle = lcsCore(oldAll.slice(pre, oldAll.length - suf), newAll.slice(pre, newAll.length - suf));
+	return [...head, ...middle.map(([i, j]) => [i + pre, j + pre] as [number, number]), ...tail];
+}
+
+function lcsCore(oldT: string[], newT: string[]): [number, number][] {
 	const n = oldT.length;
 	const m = newT.length;
 	if (n === 0 || m === 0) return [];

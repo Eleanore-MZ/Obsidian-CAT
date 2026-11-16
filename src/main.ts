@@ -1,5 +1,15 @@
+import { EditorView } from "@codemirror/view";
 import { Editor, MarkdownView, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
-import { linkUnits, otherSide, unitAtLine, unlinkedCount } from "./align";
+import { linkUnits, otherSide, PairRecord, partnerAt, Side, SnapshotUnit, unitAtLine, unlinkedCount } from "./align";
+import {
+	clearRenderedMarks,
+	HighlightSpec,
+	highlightExtension,
+	LineSpan,
+	markRenderedBlock,
+	revealIfHidden,
+	setHighlight,
+} from "./highlight";
 import { CatSettings, CatSettingTab, DEFAULT_SETTINGS } from "./settings";
 import { PairStore } from "./store";
 
@@ -7,6 +17,8 @@ export default class CatPlugin extends Plugin {
 	settings: CatSettings = DEFAULT_SETTINGS;
 	store!: PairStore;
 	private syncTimers = new Map<string, number>();
+	/** Editors that currently show highlight decorations. */
+	private decorated = new Set<EditorView>();
 
 	async onload() {
 		await this.loadSettings();
@@ -17,12 +29,14 @@ export default class CatPlugin extends Plugin {
 
 		this.registerCommands();
 		this.registerSyncEvents();
+		this.registerEditorExtension(highlightExtension((view, path, changed) => this.onCursor(view, path, changed)));
 
 		// Catch up on edits made while Obsidian was closed or the plugin was off.
 		this.app.workspace.onLayoutReady(() => void this.syncAllFromDisk());
 	}
 
 	async onunload() {
+		this.clearAll();
 		for (const t of this.syncTimers.values()) window.clearTimeout(t);
 		await this.store.flush();
 	}
@@ -33,18 +47,13 @@ export default class CatPlugin extends Plugin {
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+		this.refreshActive();
 	}
 
 	// ----- keeping alignment in step with edits -----
 
 	private registerSyncEvents() {
-		// Typing in Obsidian: follow the live editor text.
-		this.registerEvent(
-			this.app.workspace.on("editor-change", (editor, info) => {
-				const file = info.file;
-				if (file && this.store.lookup(file.path)) this.scheduleSync(file.path, () => editor.getValue(), 300);
-			}),
-		);
+		// Typing in Obsidian is followed by the editor extension (see onCursor).
 		// Changes from anywhere else (sync, other apps, other plugins).
 		this.registerEvent(
 			this.app.vault.on("modify", (file) => {
@@ -101,6 +110,112 @@ export default class CatPlugin extends Plugin {
 		}
 	}
 
+	// ----- highlighting -----
+
+	/** Called by the editor extension whenever the cursor moves or text changes. */
+	private onCursor(view: EditorView, path: string, docChanged: boolean) {
+		const hit = this.store.lookup(path);
+		if (!hit || !this.settings.highlightEnabled) {
+			this.clearAll();
+			return;
+		}
+		if (docChanged) {
+			const pending = this.syncTimers.get(path);
+			if (pending !== undefined) {
+				window.clearTimeout(pending);
+				this.syncTimers.delete(path);
+			}
+			this.store.sync(path, view.state.doc.toString());
+		}
+		const { pair, side } = hit;
+		const line = view.state.doc.lineAt(view.state.selection.main.head).number - 1;
+		const match = partnerAt(pair, side, line);
+		const partnerSide = otherSide(side);
+		const partnerViews = this.editorViewsFor(pair[partnerSide].path);
+
+		const span = (u: SnapshotUnit): LineSpan => ({ start: u.start, end: u.end });
+		const touched = new Set<EditorView>();
+		this.apply(view, { self: match ? span(match.unit) : null, partner: null, unpaired: this.unpairedSpans(pair, side) });
+		touched.add(view);
+		for (const pv of partnerViews) {
+			clearRenderedMarks(pv.contentDOM);
+			this.apply(pv, {
+				self: null,
+				partner: match ? span(match.partner) : null,
+				unpaired: this.unpairedSpans(pair, partnerSide),
+			});
+			touched.add(pv);
+			if (match) {
+				const partner = match.partner;
+				revealIfHidden(pv, span(partner));
+				const row = partner.kind === "table" ? this.tableRowIndex(pair, partnerSide, partner) : null;
+				// Tables and callouts may be drawn as widgets; mark them once drawn.
+				window.requestAnimationFrame(() => markRenderedBlock(pv, partner.start, row));
+			}
+		}
+		for (const other of [...this.decorated]) if (!touched.has(other)) this.clearView(other);
+	}
+
+	private unpairedSpans(pair: PairRecord, side: Side): LineSpan[] {
+		if (!this.settings.showUnpairedMarkers) return [];
+		const linked = new Set(pair.links.map((l) => (side === "a" ? l[0] : l[1])));
+		return pair[side].units.filter((u) => !linked.has(u.id)).map((u) => ({ start: u.start, end: u.end }));
+	}
+
+	/** Position of a table row within its table (0 = header row), for rendered tables. */
+	private tableRowIndex(pair: PairRecord, side: Side, unit: SnapshotUnit): number {
+		const units = pair[side].units;
+		let idx = units.findIndex((u) => u.id === unit.id);
+		let row = 0;
+		while (idx > 0 && units[idx - 1].kind === "table" && units[idx].start - units[idx - 1].end <= 2) {
+			row++;
+			idx--;
+		}
+		return row;
+	}
+
+	private apply(view: EditorView, spec: HighlightSpec) {
+		const empty = !spec.self && !spec.partner && spec.unpaired.length === 0;
+		if (empty && !this.decorated.has(view)) return;
+		view.dispatch({ effects: setHighlight.of(spec) });
+		if (empty) this.decorated.delete(view);
+		else this.decorated.add(view);
+	}
+
+	private clearView(view: EditorView) {
+		clearRenderedMarks(view.contentDOM);
+		this.apply(view, { self: null, partner: null, unpaired: [] });
+		this.decorated.delete(view);
+	}
+
+	private clearAll() {
+		for (const v of [...this.decorated]) this.clearView(v);
+	}
+
+	/** Re-renders highlights for the focused editor, e.g. after a settings change. */
+	refreshActive() {
+		this.clearAll();
+		const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+		const cm = view ? this.cmOf(view) : null;
+		if (view?.file && cm) this.onCursor(cm, view.file.path, false);
+	}
+
+	private cmOf(view: MarkdownView): EditorView | null {
+		const cm = (view.editor as unknown as { cm?: EditorView }).cm;
+		return cm instanceof EditorView ? cm : null;
+	}
+
+	private editorViewsFor(path: string): EditorView[] {
+		const out: EditorView[] = [];
+		this.app.workspace.iterateAllLeaves((leaf) => {
+			if (leaf.view instanceof MarkdownView && leaf.view.file?.path === path && leaf.view.getMode() === "source") {
+				const cm = this.cmOf(leaf.view);
+				if (cm) out.push(cm);
+			}
+		});
+		return out;
+	}
+
 	// ----- finding the other pane -----
 
 	/** The most recently used markdown pane showing a different note than `view`. */
@@ -134,6 +249,7 @@ export default class CatPlugin extends Plugin {
 					}
 					this.store.create(view.file.path, view.editor.getValue(), other.file.path, other.editor.getValue());
 					new Notice(`CAT: paired "${view.file.basename}" with "${other.file.basename}".`);
+					this.refreshActive();
 				}
 				return true;
 			},
@@ -147,6 +263,7 @@ export default class CatPlugin extends Plugin {
 				if (!file || !this.store.lookup(file.path)) return false;
 				if (!checking) {
 					this.store.remove(file.path);
+					this.clearAll();
 					new Notice(`CAT: "${file.basename}" is no longer paired.`);
 				}
 				return true;
@@ -164,6 +281,18 @@ export default class CatPlugin extends Plugin {
 				const other = this.otherMarkdownView(ctx, partnerPath);
 				if (!other) return false;
 				if (!checking) void this.linkCursorLines(file.path, editor, partnerPath, other.editor);
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: "jump-to-partner",
+			name: "Jump to the corresponding line in the paired note",
+			editorCheckCallback: (checking, editor: Editor, ctx) => {
+				const file = ctx.file;
+				const hit = file ? this.store.lookup(file.path) : null;
+				if (!file || !hit) return false;
+				if (!checking) void this.jumpToPartner(file.path, editor);
 				return true;
 			},
 		});
@@ -206,6 +335,36 @@ export default class CatPlugin extends Plugin {
 		if (side === "a") linkUnits(pair, myId, theirId);
 		else linkUnits(pair, theirId, myId);
 		this.store.markChanged(pair);
+		this.refreshActive();
 		new Notice("CAT: lines linked.");
+	}
+
+	private async jumpToPartner(path: string, editor: Editor) {
+		await this.syncNow(path);
+		const hit = this.store.lookup(path);
+		if (!hit) return;
+		const match = partnerAt(hit.pair, hit.side, editor.getCursor().line);
+		if (!match) {
+			new Notice("CAT: this line has no corresponding line yet.");
+			return;
+		}
+		const partnerPath = hit.pair[otherSide(hit.side)].path;
+		let target: WorkspaceLeaf | null = null;
+		this.app.workspace.iterateAllLeaves((leaf) => {
+			if (!target && leaf.view instanceof MarkdownView && leaf.view.file?.path === partnerPath) target = leaf;
+		});
+		const leaf: WorkspaceLeaf = target ?? this.app.workspace.getLeaf("split", "vertical");
+		if (!target) {
+			const file = this.app.vault.getAbstractFileByPath(partnerPath);
+			if (!(file instanceof TFile)) return;
+			await leaf.openFile(file);
+		}
+		this.app.workspace.setActiveLeaf(leaf, { focus: true });
+		const view = leaf.view;
+		if (view instanceof MarkdownView) {
+			const pos = { line: match.partner.start, ch: 0 };
+			view.editor.setCursor(pos);
+			view.editor.scrollIntoView({ from: pos, to: pos }, true);
+		}
 	}
 }

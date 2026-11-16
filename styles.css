@@ -1,1 +1,21 @@
-/* CAT Highlight styles. Highlight rules arrive in step 3. */
+/* CAT Highlight. Colours follow the theme's accent and can be overridden
+   in a CSS snippet via these variables. */
+body {
+	--cat-hl-self: rgba(var(--color-accent-rgb, 124, 77, 255), 0.10);
+	--cat-hl-partner: rgba(var(--color-accent-rgb, 124, 77, 255), 0.18);
+	--cat-unpaired: var(--text-faint);
+}
+
+.markdown-source-view .cm-line.cat-hl-self {
+	background-color: var(--cat-hl-self);
+}
+
+.markdown-source-view .cm-line.cat-hl-partner,
+.markdown-source-view .cat-hl-rendered {
+	background-color: var(--cat-hl-partner);
+	transition: background-color 120ms ease-out;
+}
+
+.markdown-source-view .cm-line.cat-unpaired {
+	box-shadow: inset 2px 0 0 var(--cat-unpaired);
+}
