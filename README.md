@@ -12,7 +12,7 @@ and nothing appears in the file tree.
 
 ## Status
 
-Version 0.0.1. All four planned steps are done: unit splitting, pairing with hidden
+Version 0.0.2. All four planned steps are done: unit splitting, pairing with hidden
 alignment storage, the Live Preview highlight, and edge-case testing. There is no
 dictionary, termbase or translation memory, by design.
 

@@ -45,14 +45,13 @@ test("translating a whole new section links it line by line", () => {
 	assert.equal(partner(pair, "a", 6), "New content one.");
 });
 
-test("partial translation in progress does not link out of order", () => {
+test("partial translation links each new line to the next untranslated one", () => {
 	const pair = make();
 	syncSide(pair, "a", [...zhLines, "新一。", "新二。"].join("\n"));
 	syncSide(pair, "b", [...enLines, "New one."].join("\n"));
-	// Two new source lines, one new target line: ambiguous, so nothing links yet.
-	assert.equal(partner(pair, "b", 5), null);
-	syncSide(pair, "b", [...enLines, "New one.", "New two."].join("\n"));
 	assert.equal(partner(pair, "b", 5), "新一。");
+	assert.equal(partner(pair, "a", 6), null);
+	syncSide(pair, "b", [...enLines, "New one.", "New two."].join("\n"));
 	assert.equal(partner(pair, "b", 6), "新二。");
 });
 

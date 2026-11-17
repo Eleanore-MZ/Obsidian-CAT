@@ -1,6 +1,6 @@
 {
   "name": "obsidian-cat",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Highlights corresponding lines and blocks between a pair of bilingual notes in Obsidian.",
   "main": "main.js",
   "private": true,

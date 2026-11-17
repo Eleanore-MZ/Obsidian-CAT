@@ -311,10 +311,10 @@ export function cleanLinks(pair: PairRecord): void {
 }
 
 /**
- * Links unpaired units automatically when it is unambiguous: between two
- * consecutive linked units, if both notes have the same number of unpaired
- * units, they are linked in order. This covers the common case of writing a
- * new line in the source and then its translation in the target.
+ * Links unpaired units automatically: between two consecutive linked units,
+ * the unpaired units of both notes are linked in order, as far as both sides
+ * have them. Writing several new source lines and then translating them one
+ * by one links each translation to the next untranslated source line.
  */
 export function autoLink(pair: PairRecord): void {
 	const posA = new Map(pair.a.units.map((u, i) => [u.id, i]));
@@ -334,9 +334,8 @@ export function autoLink(pair: PairRecord): void {
 		const [a1, b1] = bounds[k + 1];
 		const freeA = pair.a.units.slice(a0 + 1, a1).filter((u) => !linkedA.has(u.id));
 		const freeB = pair.b.units.slice(b0 + 1, b1).filter((u) => !linkedB.has(u.id));
-		if (freeA.length > 0 && freeA.length === freeB.length) {
-			for (let i = 0; i < freeA.length; i++) pair.links.push([freeA[i].id, freeB[i].id]);
-		}
+		const n = Math.min(freeA.length, freeB.length);
+		for (let i = 0; i < n; i++) pair.links.push([freeA[i].id, freeB[i].id]);
 	}
 }
 
