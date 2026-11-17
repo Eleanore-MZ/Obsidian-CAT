@@ -82,3 +82,27 @@ test("long notes re-sync quickly after a small edit", () => {
 	assert.equal(partner(pair, "a", 3001), en[3000]);
 	console.log(`  long note sync: ${per.toFixed(1)} ms per edit`);
 });
+
+test("splitting a line on both sides pairs first halves and second halves", () => {
+	for (const [zh1, zh2, en1, en2] of [
+		["今天天气很好，", "非常非常适合出门去公园散步。", "The weather is nice today,", "perfect for a walk."],
+		["今天天气非常非常好，", "适合出门。", "The weather is nice,", "so we should definitely go out for a long walk."],
+	]) {
+		const pair = createPair("p", "zh.md", `# 标题\n${zh1}${zh2}\n结尾。`, "en.md", `# Title\n${en1} ${en2}\nThe end.`);
+		syncSide(pair, "a", `# 标题\n${zh1}\n${zh2}\n结尾。`);
+		assert.equal(partner(pair, "a", 1), `${en1} ${en2}`, "first half keeps the link while only one side is split");
+		assert.equal(partner(pair, "a", 2), null);
+		syncSide(pair, "b", `# Title\n${en1}\n${en2}\nThe end.`);
+		assert.equal(partner(pair, "a", 1), en1);
+		assert.equal(partner(pair, "a", 2), en2);
+		assert.equal(partner(pair, "a", 3), "The end.");
+	}
+});
+
+test("splitting with Enter then typing the translation in order", () => {
+	const pair = createPair("p", "zh.md", "第一句很长很长。第二句短。\n其他。", "en.md", "First sentence is long. Second is short.\nOther.");
+	syncSide(pair, "b", "First sentence is long.\nSecond is short.\nOther.");
+	syncSide(pair, "a", "第一句很长很长。\n第二句短。\n其他。");
+	assert.equal(partner(pair, "a", 0), "First sentence is long.");
+	assert.equal(partner(pair, "a", 1), "Second is short.");
+});

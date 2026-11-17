@@ -70,6 +70,20 @@ export function similarity(x: string, y: string): number {
 }
 
 const SIMILAR_ENOUGH = 0.35;
+
+/**
+ * Score used when re-matching edited lines. A line that is a piece of the old
+ * line (or contains it) scores as a full match, so when a line is split every
+ * piece ties and the tie goes to the first piece. That keeps splits on both
+ * sides consistent: first halves stay linked, and the new second halves are
+ * left to link to each other.
+ */
+function gapScore(oldText: string, newText: string): number {
+	const a = normalise(oldText).toLowerCase();
+	const b = normalise(newText).toLowerCase();
+	if (a.length > 0 && b.length > 0 && (a.includes(b) || b.includes(a))) return 1;
+	return similarity(oldText, newText);
+}
 const MAX_DP_CELLS = 4_000_000;
 
 /**
@@ -159,7 +173,7 @@ function matchGap(oldT: string[], newT: string[]): [number, number][] {
 	const w = m + 1;
 	const dp = new Float64Array((n + 1) * w);
 	const sim = (i: number, j: number) => {
-		const s = similarity(oldT[i], newT[j]);
+		const s = gapScore(oldT[i], newT[j]);
 		return s >= SIMILAR_ENOUGH ? s : -1;
 	};
 	const simCache = new Float64Array(n * m);
