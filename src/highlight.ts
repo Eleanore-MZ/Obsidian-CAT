@@ -57,7 +57,31 @@ export const highlightField = StateField.define<DecorationSet>({
 });
 
 export interface CursorListener {
-	(view: EditorView, path: string, docChanged: boolean): void;
+	/** `line` overrides the cursor line, e.g. for a cursor inside a table cell. */
+	(view: EditorView, path: string, docChanged: boolean, line?: number): void;
+}
+
+/**
+ * Live Preview edits table cells in small nested editors. Maps such a nested
+ * editor to its outer note editor and the 0-based line of its table row.
+ */
+function resolveNested(inner: EditorView): { outer: EditorView; line: number } | null {
+	const outerEl = inner.dom.parentElement?.closest(".cm-editor");
+	if (!(outerEl instanceof HTMLElement)) return null;
+	const outer = EditorView.findFromDOM(outerEl);
+	const tr = inner.dom.closest("tr");
+	const table = inner.dom.closest("table");
+	const widget = inner.dom.closest(".cm-embed-block, .cm-table-widget");
+	if (!outer || !tr || !table || !(widget instanceof HTMLElement)) return null;
+	const rowIndex = Array.from(table.querySelectorAll("tr")).indexOf(tr);
+	let start: number;
+	try {
+		start = outer.state.doc.lineAt(outer.posAtDOM(widget)).number - 1;
+	} catch {
+		return null;
+	}
+	// Row 0 is the header; the |---| divider line sits between it and row 1.
+	return { outer, line: start + (rowIndex <= 0 ? 0 : rowIndex + 1) };
 }
 
 export function highlightExtension(onCursor: CursorListener): Extension {
@@ -71,13 +95,22 @@ export function highlightExtension(onCursor: CursorListener): Extension {
 				// text is provisional; wait for the commit to avoid flicker.
 				if (u.view.composing) return;
 				if (u.focusChanged && !u.view.hasFocus) return;
-				const path = u.state.field(editorInfoField, false)?.file?.path;
-				if (!path) return;
 				const changed = this.pendingDocChange;
 				this.pendingDocChange = false;
+				const isNested = !!u.view.dom.parentElement?.closest(".cm-editor");
 				// Dispatching from inside an update is not allowed; defer.
-				const view = u.view;
-				queueMicrotask(() => onCursor(view, path, changed));
+				queueMicrotask(() => {
+					if (isNested) {
+						// A table-cell editor: never sync its text (it is only one
+						// cell); the outer editor reports the real document change.
+						const hit = resolveNested(u.view);
+						const path = hit?.outer.state.field(editorInfoField, false)?.file?.path;
+						if (hit && path) onCursor(hit.outer, path, false, hit.line);
+						return;
+					}
+					const path = u.state.field(editorInfoField, false)?.file?.path;
+					if (path) onCursor(u.view, path, changed);
+				});
 			}
 		},
 	);

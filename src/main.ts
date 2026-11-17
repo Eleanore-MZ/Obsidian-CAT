@@ -29,7 +29,7 @@ export default class CatPlugin extends Plugin {
 
 		this.registerCommands();
 		this.registerSyncEvents();
-		this.registerEditorExtension(highlightExtension((view, path, changed) => this.onCursor(view, path, changed)));
+		this.registerEditorExtension(highlightExtension((view, path, changed, line) => this.onCursor(view, path, changed, line)));
 
 		// Catch up on edits made while Obsidian was closed or the plugin was off.
 		this.app.workspace.onLayoutReady(() => void this.syncAllFromDisk());
@@ -113,7 +113,7 @@ export default class CatPlugin extends Plugin {
 	// ----- highlighting -----
 
 	/** Called by the editor extension whenever the cursor moves or text changes. */
-	private onCursor(view: EditorView, path: string, docChanged: boolean) {
+	private onCursor(view: EditorView, path: string, docChanged: boolean, lineOverride?: number) {
 		const hit = this.store.lookup(path);
 		if (!hit || !this.settings.highlightEnabled) {
 			this.clearAll();
@@ -128,7 +128,7 @@ export default class CatPlugin extends Plugin {
 			this.store.sync(path, view.state.doc.toString());
 		}
 		const { pair, side } = hit;
-		const line = view.state.doc.lineAt(view.state.selection.main.head).number - 1;
+		const line = lineOverride ?? view.state.doc.lineAt(view.state.selection.main.head).number - 1;
 		const match = partnerAt(pair, side, line);
 		const partnerSide = otherSide(side);
 		const partnerViews = this.editorViewsFor(pair[partnerSide].path);
