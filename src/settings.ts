@@ -4,6 +4,8 @@ import type CatPlugin from "./main";
 export interface CatSettings {
 	/** Turn the corresponding-block highlight on or off. */
 	highlightEnabled: boolean;
+	/** Tint the line under the cursor as well as its partner. */
+	highlightSelf: boolean;
 	/** Tint lines that have no partner yet. */
 	showUnpairedMarkers: boolean;
 	/** Scroll the partner into view when it is off screen. */
@@ -24,6 +26,7 @@ export interface CatSettings {
 
 export const DEFAULT_SETTINGS: CatSettings = {
 	highlightEnabled: true,
+	highlightSelf: true,
 	showUnpairedMarkers: false,
 	scrollPartner: true,
 	selfColor: "",
@@ -115,6 +118,11 @@ export class CatSettingTab extends PluginSettingTab {
 			.setName("Highlight corresponding blocks")
 			.setDesc("Highlight the matching line or block in the paired note while editing.")
 			.addToggle((t) => t.setValue(this.plugin.settings.highlightEnabled).onChange((v) => this.setValues({ highlightEnabled: v })));
+
+		new Setting(containerEl)
+			.setName("Highlight the current line")
+			.setDesc("Also tint the line your cursor is on. When off, only its partner in the other note is highlighted.")
+			.addToggle((t) => t.setValue(this.plugin.settings.highlightSelf).onChange((v) => this.setValues({ highlightSelf: v })));
 
 		new Setting(containerEl)
 			.setName("Scroll to the corresponding block")

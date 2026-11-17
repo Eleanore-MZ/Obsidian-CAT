@@ -153,7 +153,7 @@ export default class CatPlugin extends Plugin {
 		const span = (u: SnapshotUnit): LineSpan => ({ start: u.start, end: u.end });
 		const touched = new Set<EditorView>();
 		clearRenderedMarks(view.contentDOM);
-		this.apply(view, { self: match ? span(match.unit) : null, partner: null, unpaired: this.unpairedSpans(pair, side) });
+		this.apply(view, { self: match && this.settings.highlightSelf ? span(match.unit) : null, partner: null, unpaired: this.unpairedSpans(pair, side) });
 		touched.add(view);
 		for (const pv of partnerViews) {
 			clearRenderedMarks(pv.contentDOM);

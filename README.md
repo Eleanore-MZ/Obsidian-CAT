@@ -35,6 +35,7 @@ button.
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | Highlight corresponding blocks | On | Master switch for the highlight. |
+| Highlight the current line | On | Also tint the line under the cursor, not just its partner. |
 | Scroll to the corresponding block | On | Centre the partner in its pane when it is off screen. |
 | Highlight unpaired lines | Off | Tint lines that have no partner yet. |
 | Current line colour | Theme accent, 10% | Tint of the line under the cursor. |
