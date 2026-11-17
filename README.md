@@ -12,7 +12,7 @@ and nothing appears in the file tree.
 
 ## Status
 
-Version 0.1.0. All four planned steps are done: unit splitting, pairing with hidden
+Version 0.0.1. All four planned steps are done: unit splitting, pairing with hidden
 alignment storage, the Live Preview highlight, and edge-case testing. There is no
 dictionary, termbase or translation memory, by design.
 
@@ -77,6 +77,16 @@ not scramble the pairs. When both notes gain the same number of new lines betwee
 already-linked lines (for example a new sentence and then its translation), they are
 linked automatically. Renaming or moving a paired note keeps the pairing; deleting one
 removes it.
+
+## Installing with BRAT
+
+1. Install and enable the community plugin "BRAT" (Obsidian42 - BRAT).
+2. Run "BRAT: Add a beta plugin for testing" from the command palette.
+3. Enter `https://github.com/Eleanore-MZ/Obsidian-CAT` and pick the latest version.
+4. Enable **CAT Highlight** under Settings, Community plugins.
+
+Each release on GitHub carries `main.js`, `manifest.json` and `styles.css`, which is what
+BRAT downloads.
 
 ## Development (Windows)
 
