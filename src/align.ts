@@ -271,11 +271,22 @@ export function createPair(id: string, pathA: string, textA: string, pathB: stri
  */
 export function syncSide(pair: PairRecord, side: Side, text: string): boolean {
 	const state = pair[side];
-	const before = JSON.stringify([state.units, pair.links]);
-	state.units = remapIds(state.units, parseUnits(text), makeIdGen(pair));
+	const oldUnits = state.units;
+	const oldLinks = pair.links.length;
+	state.units = remapIds(oldUnits, parseUnits(text), makeIdGen(pair));
 	cleanLinks(pair);
 	autoLink(pair);
-	return JSON.stringify([state.units, pair.links]) !== before;
+	return pair.links.length !== oldLinks || !sameUnits(oldUnits, state.units);
+}
+
+function sameUnits(x: SnapshotUnit[], y: SnapshotUnit[]): boolean {
+	if (x.length !== y.length) return false;
+	for (let i = 0; i < x.length; i++) {
+		const a = x[i];
+		const b = y[i];
+		if (a.id !== b.id || a.start !== b.start || a.end !== b.end || a.text !== b.text) return false;
+	}
+	return true;
 }
 
 /** Drops links whose unit no longer exists on either side. */

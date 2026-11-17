@@ -12,8 +12,9 @@ and nothing appears in the file tree.
 
 ## Status
 
-Step 3 of 4: pairing, alignment tracking and the Live Preview highlight work. Step 4
-(testing and polish) is next.
+Version 0.1.0. All four planned steps are done: unit splitting, pairing with hidden
+alignment storage, the Live Preview highlight, and edge-case testing. There is no
+dictionary, termbase or translation memory, by design.
 
 ## The highlight
 
@@ -25,8 +26,40 @@ candidate is being composed the highlight waits for the commit, so it does not f
 Reading view is never touched. Tables and callouts that Live Preview draws as rendered
 blocks are highlighted as a block (or, for tables, the matching row).
 
-Colours follow the theme accent. To change them, add a CSS snippet that sets
-`--cat-hl-self`, `--cat-hl-partner` or `--cat-unpaired` on `body`.
+Colours follow the theme accent. To change them, add a CSS snippet (Settings,
+Appearance, CSS snippets) such as:
+
+```css
+body {
+	--cat-hl-self: rgba(255, 200, 0, 0.12);
+	--cat-hl-partner: rgba(255, 200, 0, 0.25);
+	--cat-unpaired: var(--text-error);
+}
+```
+
+## Settings
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| Highlight corresponding blocks | On | Master switch for the highlight. |
+| Scroll to the corresponding block | On | Centre the partner in its pane when it is off screen. |
+| Mark unpaired lines | Off | Faint bar at the left of lines that have no partner yet. |
+
+## Where the data lives
+
+Each pair is a small JSON file in `.obsidian\plugins\cat-highlight\pairs\`. Nothing is
+written into your notes, and nothing appears in the file tree, search or graph. Removing
+the plugin removes the pairings, but never touches the notes. With Obsidian Sync, the
+pairings only travel between devices when "Installed community plugins" is synced.
+
+## Known limits
+
+Matching is one-to-one: a line has at most one partner. If you split one source line into
+two, the link stays on the half that is most similar to the old text, and the other half
+is left unpaired until you write its translation or link it by hand. Very large rewrites
+done outside Obsidian (for example replacing most of a note at once) can leave many lines
+unpaired; use "Link the current line with the cursor line in the paired note" to fix
+individual pairs, or unpair and pair again to start over in order.
 
 ## Using it
 

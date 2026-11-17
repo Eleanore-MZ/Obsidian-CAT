@@ -126,6 +126,9 @@ export default class CatPlugin extends Plugin {
 				this.syncTimers.delete(path);
 			}
 			this.store.sync(path, view.state.doc.toString());
+			// A change in an editor you are not typing in (another plugin, a
+			// table-cell edit landing in the note) should not move the highlight.
+			if (!view.hasFocus && lineOverride === undefined) return;
 		}
 		const { pair, side } = hit;
 		const line = lineOverride ?? view.state.doc.lineAt(view.state.selection.main.head).number - 1;
@@ -148,7 +151,7 @@ export default class CatPlugin extends Plugin {
 			touched.add(pv);
 			if (match) {
 				const partner = match.partner;
-				revealIfHidden(pv, span(partner));
+				if (this.settings.scrollPartner) revealIfHidden(pv, span(partner));
 				const row = partner.kind === "table" ? this.tableRowIndex(pair, partnerSide, partner) : null;
 				// Tables and callouts may be drawn as widgets; mark them once drawn.
 				window.requestAnimationFrame(() => markRenderedBlock(pv, partner.start, row));
