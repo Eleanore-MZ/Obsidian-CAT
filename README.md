@@ -13,7 +13,7 @@ and nothing appears in the file tree.
 
 ## Status
 
-Version 0.0.3. All four planned steps are done: unit splitting, pairing with hidden
+Version 0.0.4. All four planned steps are done: unit splitting, pairing with hidden
 alignment storage, the Live Preview highlight, and edge-case testing. There is no
 dictionary, termbase or translation memory, by design.
 
@@ -39,6 +39,8 @@ button.
 | Highlight the current line | On | Also tint the line under the cursor, not just its partner. |
 | Scroll to the corresponding block | On | Centre the partner in its pane when it is off screen. |
 | Highlight unpaired lines | Off | Tint lines that have no partner yet. |
+| Highlight draft lines | On | Tint lines marked as drafts, on both notes. |
+| Draft lines colour | Red, 16% | Tint of draft lines; layered with the cursor highlight when both apply. |
 | Show the translation button | On | Button at the top right of each note for translation mode. |
 | Where new translation notes go | Same folder | Same folder as the source, a dedicated folder, or the vault root. |
 | New note name | `{{name}} (translation)` | `{{name}}` is the source note's name. |
@@ -74,6 +76,8 @@ palette (Ctrl+P). Each can also be given a hotkey.
 | Link the current line with the cursor line in the paired note | Fixes a single correspondence by hand. |
 | Jump to the corresponding line in the paired note | Moves the cursor to the partner line, opening the partner in a split if needed. |
 | Open translation mode | Opens the paired note in a split; creates and pairs a new note first if there is none. Also available as a button at the top right of each note. |
+| Toggle draft on the current line (and its partner) | Marks or unmarks the line and its translation as a draft. Assign a hotkey for quick use. |
+| Go to the next draft line | Moves the cursor to the next draft in this note, wrapping around. |
 | Show pairing status | Shows how many units are linked and how many are not. |
 
 While you write, the plugin compares each note with its last snapshot and carries every

@@ -1,6 +1,6 @@
 import { EditorView } from "@codemirror/view";
-import { Editor, MarkdownView, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
-import { linkUnits, otherSide, PairRecord, partnerAt, Side, SnapshotUnit, unitAtLine, unlinkedCount } from "./align";
+import { Editor, editorInfoField, MarkdownView, Notice, Plugin, TFile, WorkspaceLeaf } from "obsidian";
+import { draftUnits, linkUnits, otherSide, PairRecord, partnerAt, Side, SnapshotUnit, toggleDraft, unitAtLine, unlinkedCount } from "./align";
 import {
 	clearRenderedMarks,
 	HighlightSpec,
@@ -33,7 +33,13 @@ export default class CatPlugin extends Plugin {
 		this.registerCommands();
 		this.registerSyncEvents();
 		this.app.workspace.onLayoutReady(() => this.translation.syncButtons());
-		this.registerEvent(this.app.workspace.on("layout-change", () => this.translation.syncButtons()));
+		this.registerEvent(
+			this.app.workspace.on("layout-change", () => {
+				this.translation.syncButtons();
+				this.paintAllMarkers();
+			}),
+		);
+		this.app.workspace.onLayoutReady(() => this.paintAllMarkers());
 		this.registerEditorExtension(highlightExtension((view, path, changed, line) => this.onCursor(view, path, changed, line)));
 
 		// Catch up on edits made while Obsidian was closed or the plugin was off.
@@ -135,11 +141,7 @@ export default class CatPlugin extends Plugin {
 	/** Called by the editor extension whenever the cursor moves or text changes. */
 	private onCursor(view: EditorView, path: string, docChanged: boolean, lineOverride?: number) {
 		const hit = this.store.lookup(path);
-		if (!hit || !this.settings.highlightEnabled) {
-			this.clearAll();
-			return;
-		}
-		if (docChanged) {
+		if (hit && docChanged) {
 			const pending = this.syncTimers.get(path);
 			if (pending !== undefined) {
 				window.clearTimeout(pending);
@@ -148,7 +150,15 @@ export default class CatPlugin extends Plugin {
 			this.store.sync(path, view.state.doc.toString());
 			// A change in an editor you are not typing in (another plugin, a
 			// table-cell edit landing in the note) should not move the highlight.
-			if (!view.hasFocus && lineOverride === undefined) return;
+			if (!view.hasFocus && lineOverride === undefined) {
+				this.paintMarkers(view, path);
+				return;
+			}
+		}
+		if (!hit || !this.settings.highlightEnabled) {
+			this.resetAll();
+			if (hit) this.paintMarkers(view, path);
+			return;
 		}
 		const { pair, side } = hit;
 		const line = lineOverride ?? view.state.doc.lineAt(view.state.selection.main.head).number - 1;
@@ -159,15 +169,15 @@ export default class CatPlugin extends Plugin {
 		const span = (u: SnapshotUnit): LineSpan => ({ start: u.start, end: u.end });
 		const touched = new Set<EditorView>();
 		clearRenderedMarks(view.contentDOM);
-		this.apply(view, { self: match && this.settings.highlightSelf ? span(match.unit) : null, partner: null, unpaired: this.unpairedSpans(pair, side) });
+		this.apply(view, {
+			self: match && this.settings.highlightSelf ? span(match.unit) : null,
+			partner: null,
+			...this.markers(pair, side),
+		});
 		touched.add(view);
 		for (const pv of partnerViews) {
 			clearRenderedMarks(pv.contentDOM);
-			this.apply(pv, {
-				self: null,
-				partner: match ? span(match.partner) : null,
-				unpaired: this.unpairedSpans(pair, partnerSide),
-			});
+			this.apply(pv, { self: null, partner: match ? span(match.partner) : null, ...this.markers(pair, partnerSide) });
 			touched.add(pv);
 			if (match) {
 				const partner = match.partner;
@@ -177,7 +187,32 @@ export default class CatPlugin extends Plugin {
 				window.requestAnimationFrame(() => markRenderedBlock(pv, partner.start, row));
 			}
 		}
-		for (const other of [...this.decorated]) if (!touched.has(other)) this.clearView(other);
+		for (const other of [...this.decorated]) if (!touched.has(other)) this.paintMarkers(other);
+	}
+
+	/** The always-on markers (drafts, unpaired lines) for one side of a pair. */
+	private markers(pair: PairRecord, side: Side): { unpaired: LineSpan[]; drafts: LineSpan[] } {
+		const drafts = this.settings.showDrafts
+			? draftUnits(pair, side).map((u) => ({ start: u.start, end: u.end }))
+			: [];
+		return { unpaired: this.unpairedSpans(pair, side), drafts };
+	}
+
+	/** Shows only the always-on markers in an editor, without the cursor highlight. */
+	private paintMarkers(view: EditorView, path?: string) {
+		clearRenderedMarks(view.contentDOM);
+		const p = path ?? view.state.field(editorInfoField, false)?.file?.path;
+		const hit = p ? this.store.lookup(p) : null;
+		this.apply(view, { self: null, partner: null, ...(hit ? this.markers(hit.pair, hit.side) : { unpaired: [], drafts: [] }) });
+	}
+
+	/** Paints markers in every open paired note (e.g. after opening a note or a settings change). */
+	paintAllMarkers() {
+		this.app.workspace.iterateAllLeaves((leaf) => {
+			if (!(leaf.view instanceof MarkdownView) || !leaf.view.file || leaf.view.getMode() !== "source") return;
+			const cm = this.cmOf(leaf.view);
+			if (cm && (this.decorated.has(cm) || this.store.lookup(leaf.view.file.path))) this.paintMarkers(cm, leaf.view.file.path);
+		});
 	}
 
 	private unpairedSpans(pair: PairRecord, side: Side): LineSpan[] {
@@ -199,7 +234,7 @@ export default class CatPlugin extends Plugin {
 	}
 
 	private apply(view: EditorView, spec: HighlightSpec) {
-		const empty = !spec.self && !spec.partner && spec.unpaired.length === 0;
+		const empty = !spec.self && !spec.partner && spec.unpaired.length === 0 && spec.drafts.length === 0;
 		if (empty && !this.decorated.has(view)) return;
 		view.dispatch({ effects: setHighlight.of(spec) });
 		if (empty) this.decorated.delete(view);
@@ -208,17 +243,24 @@ export default class CatPlugin extends Plugin {
 
 	private clearView(view: EditorView) {
 		clearRenderedMarks(view.contentDOM);
-		this.apply(view, { self: null, partner: null, unpaired: [] });
+		this.apply(view, { self: null, partner: null, unpaired: [], drafts: [] });
 		this.decorated.delete(view);
 	}
 
+	/** Removes every decoration (used on unload). */
 	private clearAll() {
 		for (const v of [...this.decorated]) this.clearView(v);
 	}
 
+	/** Drops the cursor highlight everywhere but keeps drafts and unpaired markers. */
+	private resetAll() {
+		for (const v of [...this.decorated]) this.paintMarkers(v);
+	}
+
 	/** Re-renders highlights for the focused editor, e.g. after a settings change. */
 	refreshActive() {
-		this.clearAll();
+		this.resetAll();
+		this.paintAllMarkers();
 		const view = this.app.workspace.getActiveViewOfType(MarkdownView);
 		const cm = view ? this.cmOf(view) : null;
 		if (view?.file && cm) this.onCursor(cm, view.file.path, false);
@@ -333,6 +375,39 @@ export default class CatPlugin extends Plugin {
 		});
 
 		this.addCommand({
+			id: "toggle-draft",
+			name: "Toggle draft on the current line (and its partner)",
+			editorCheckCallback: (checking, editor: Editor, ctx) => {
+				const file = ctx.file;
+				if (!file || !this.store.lookup(file.path)) return false;
+				if (!checking) void this.toggleDraftAt(file.path, editor.getCursor().line);
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: "next-draft",
+			name: "Go to the next draft line",
+			editorCheckCallback: (checking, editor: Editor, ctx) => {
+				const file = ctx.file;
+				const hit = file ? this.store.lookup(file.path) : null;
+				if (!file || !hit) return false;
+				if (!checking) {
+					const drafts = draftUnits(hit.pair, hit.side);
+					if (drafts.length === 0) {
+						new Notice("CAT: no draft lines in this note.");
+						return true;
+					}
+					const cur = editor.getCursor().line;
+					const next = drafts.find((u) => u.start > cur) ?? drafts[0];
+					editor.setCursor({ line: next.start, ch: 0 });
+					editor.scrollIntoView({ from: { line: next.start, ch: 0 }, to: { line: next.end, ch: 0 } }, true);
+				}
+				return true;
+			},
+		});
+
+		this.addCommand({
 			id: "show-status",
 			name: "Show pairing status",
 			checkCallback: (checking) => {
@@ -401,5 +476,19 @@ export default class CatPlugin extends Plugin {
 			view.editor.setCursor(pos);
 			view.editor.scrollIntoView({ from: pos, to: pos }, true);
 		}
+	}
+
+	private async toggleDraftAt(path: string, line: number) {
+		await this.syncNow(path);
+		const hit = this.store.lookup(path);
+		if (!hit) return;
+		const state = toggleDraft(hit.pair, hit.side, line);
+		if (state === null) {
+			new Notice("CAT: put the cursor on a line with text first.");
+			return;
+		}
+		this.store.markChanged(hit.pair);
+		if (!this.settings.showDrafts) new Notice(state ? "CAT: marked as draft." : "CAT: draft cleared.");
+		this.refreshActive();
 	}
 }

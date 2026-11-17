@@ -18,31 +18,44 @@ export interface HighlightSpec {
 	self: LineSpan | null;
 	partner: LineSpan | null;
 	unpaired: LineSpan[];
+	drafts: LineSpan[];
 }
 
 export const setHighlight = StateEffect.define<HighlightSpec>();
 
-const selfDeco = Decoration.line({ class: "cat-hl cat-hl-self" });
-const partnerDeco = Decoration.line({ class: "cat-hl cat-hl-partner" });
-const unpairedDeco = Decoration.line({ class: "cat-unpaired" });
+const decoCache = new Map<string, Decoration>();
+function lineDeco(classes: string): Decoration {
+	let d = decoCache.get(classes);
+	if (!d) {
+		d = Decoration.line({ class: classes });
+		decoCache.set(classes, d);
+	}
+	return d;
+}
 
 function build(doc: Text, spec: HighlightSpec): DecorationSet {
-	const marks: { line: number; deco: Decoration }[] = [];
-	const add = (span: LineSpan | null, deco: Decoration) => {
+	// Collect the classes for each line; a line can be both a draft and
+	// highlighted, and the CSS layers the two colours.
+	const byLine = new Map<number, Set<string>>();
+	const add = (span: LineSpan | null, cls: string) => {
 		if (!span) return;
 		const last = Math.min(span.end, doc.lines - 1);
-		for (let l = Math.max(0, span.start); l <= last; l++) marks.push({ line: l, deco });
+		for (let l = Math.max(0, span.start); l <= last; l++) {
+			let set = byLine.get(l);
+			if (!set) byLine.set(l, (set = new Set()));
+			set.add(cls);
+		}
 	};
-	for (const span of spec.unpaired) add(span, unpairedDeco);
-	add(spec.partner, partnerDeco);
-	add(spec.self, selfDeco);
-	// One decoration per line; the active highlight wins over the unpaired marker.
-	const byLine = new Map<number, Decoration>();
-	for (const m of marks) byLine.set(m.line, m.deco);
+	for (const span of spec.unpaired) add(span, "cat-unpaired");
+	for (const span of spec.drafts) add(span, "cat-draft");
+	add(spec.partner, "cat-hl cat-hl-partner");
+	add(spec.self, "cat-hl cat-hl-self");
 	const builder = new RangeSetBuilder<Decoration>();
 	for (const line of [...byLine.keys()].sort((a, b) => a - b)) {
+		const set = byLine.get(line)!;
+		if (set.has("cat-draft")) set.delete("cat-unpaired");
 		const pos = doc.line(line + 1).from;
-		builder.add(pos, pos, byLine.get(line)!);
+		builder.add(pos, pos, lineDeco([...set].join(" ")));
 	}
 	return builder.finish();
 }

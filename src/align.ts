@@ -32,6 +32,8 @@ export interface PairRecord {
 	/** Links as [id on side a, id on side b]. One-to-one. */
 	links: [string, string][];
 	nextId: number;
+	/** Ids of units (on either side) marked as drafts. */
+	drafts?: string[];
 }
 
 export type Side = "a" | "b";
@@ -287,10 +289,11 @@ export function syncSide(pair: PairRecord, side: Side, text: string): boolean {
 	const state = pair[side];
 	const oldUnits = state.units;
 	const oldLinks = pair.links.length;
+	const draftsBefore = pair.drafts?.length ?? 0;
 	state.units = remapIds(oldUnits, parseUnits(text), makeIdGen(pair));
 	cleanLinks(pair);
 	autoLink(pair);
-	return pair.links.length !== oldLinks || !sameUnits(oldUnits, state.units);
+	return pair.links.length !== oldLinks || !sameUnits(oldUnits, state.units) || (pair.drafts?.length ?? 0) !== draftsBefore;
 }
 
 function sameUnits(x: SnapshotUnit[], y: SnapshotUnit[]): boolean {
@@ -308,6 +311,34 @@ export function cleanLinks(pair: PairRecord): void {
 	const aIds = new Set(pair.a.units.map((u) => u.id));
 	const bIds = new Set(pair.b.units.map((u) => u.id));
 	pair.links = pair.links.filter(([a, b]) => aIds.has(a) && bIds.has(b));
+	if (pair.drafts?.length) pair.drafts = pair.drafts.filter((id) => aIds.has(id) || bIds.has(id));
+}
+
+/**
+ * Toggles the draft mark on the unit at `line` and on its partner, if any.
+ * Returns the new state, or null when the line is not part of any unit.
+ */
+export function toggleDraft(pair: PairRecord, side: Side, line: number): boolean | null {
+	const idx = unitAtLine(pair[side].units, line);
+	if (idx < 0) return null;
+	const id = pair[side].units[idx].id;
+	const link = pair.links.find((l) => (side === "a" ? l[0] : l[1]) === id);
+	const ids = link ? [link[0], link[1]] : [id];
+	const drafts = new Set(pair.drafts ?? []);
+	const makeDraft = !drafts.has(id);
+	for (const x of ids) {
+		if (makeDraft) drafts.add(x);
+		else drafts.delete(x);
+	}
+	pair.drafts = [...drafts];
+	return makeDraft;
+}
+
+/** Line spans of draft units on one side. */
+export function draftUnits(pair: PairRecord, side: Side): SnapshotUnit[] {
+	if (!pair.drafts?.length) return [];
+	const drafts = new Set(pair.drafts);
+	return pair[side].units.filter((u) => drafts.has(u.id));
 }
 
 /**

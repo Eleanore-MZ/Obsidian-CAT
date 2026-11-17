@@ -4,6 +4,7 @@ body {
 	--cat-hl-self: rgba(var(--color-accent-rgb, 124, 77, 255), 0.10);
 	--cat-hl-partner: rgba(var(--color-accent-rgb, 124, 77, 255), 0.18);
 	--cat-unpaired: rgba(229, 165, 10, 0.12);
+	--cat-draft: rgba(229, 83, 75, 0.16);
 }
 
 /*
@@ -14,6 +15,7 @@ body {
 .markdown-source-view .cm-line.cat-hl-self,
 .markdown-source-view .cm-line.cat-hl-partner,
 .markdown-source-view .cm-line.cat-unpaired,
+.markdown-source-view .cm-line.cat-draft,
 .markdown-source-view .cat-hl-rendered:not(tr) {
 	position: relative;
 }
@@ -21,6 +23,7 @@ body {
 .markdown-source-view .cm-line.cat-hl-self::after,
 .markdown-source-view .cm-line.cat-hl-partner::after,
 .markdown-source-view .cm-line.cat-unpaired::after,
+.markdown-source-view .cm-line.cat-draft::after,
 .markdown-source-view .cat-hl-rendered:not(tr)::after {
 	content: "";
 	position: absolute;
@@ -42,6 +45,19 @@ body {
 
 .markdown-source-view .cm-line.cat-unpaired::after {
 	background-color: var(--cat-unpaired);
+}
+
+.markdown-source-view .cm-line.cat-draft::after {
+	background-color: var(--cat-draft);
+}
+
+/* A draft line under the cursor (or its partner) shows both colours layered. */
+.markdown-source-view .cm-line.cat-draft.cat-hl-self::after {
+	background: linear-gradient(var(--cat-hl-self), var(--cat-hl-self)), var(--cat-draft);
+}
+
+.markdown-source-view .cm-line.cat-draft.cat-hl-partner::after {
+	background: linear-gradient(var(--cat-hl-partner), var(--cat-hl-partner)), var(--cat-draft);
 }
 
 /* Table rows cannot hold an overlay, so tint each cell from the inside;

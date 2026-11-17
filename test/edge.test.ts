@@ -105,3 +105,24 @@ test("splitting with Enter then typing the translation in order", () => {
 	assert.equal(partner(pair, "a", 0), "First sentence is long.");
 	assert.equal(partner(pair, "a", 1), "Second is short.");
 });
+
+test("draft marks cover both partners, survive edits and toggle off", async () => {
+	const { toggleDraft, draftUnits } = await import("../src/align");
+	const pair = make();
+	assert.equal(toggleDraft(pair, "a", 2), true);
+	assert.deepEqual(draftUnits(pair, "a").map((u) => u.text), ["第二句。"]);
+	assert.deepEqual(draftUnits(pair, "b").map((u) => u.text), ["Sentence two."]);
+	syncSide(pair, "a", ["# 标题", "新的一句。", "第一句。", "第二句（改）。", "第三句。", "第四句。"].join("\n"));
+	assert.deepEqual(draftUnits(pair, "a").map((u) => u.start), [3]);
+	assert.equal(toggleDraft(pair, "b", 2), false);
+	assert.equal(draftUnits(pair, "a").length + draftUnits(pair, "b").length, 0);
+});
+
+test("deleting a draft line drops its mark", async () => {
+	const { toggleDraft, draftUnits } = await import("../src/align");
+	const pair = make();
+	toggleDraft(pair, "b", 3);
+	syncSide(pair, "b", ["# Title", "Sentence one.", "Sentence two.", "Sentence four."].join("\n"));
+	assert.deepEqual(draftUnits(pair, "a").map((u) => u.text), ["第三句。"]);
+	assert.equal(draftUnits(pair, "b").length, 0);
+});
