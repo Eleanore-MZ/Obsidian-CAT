@@ -151,7 +151,7 @@ export function markRenderedBlock(view: EditorView, line: number, rowIndex: numb
 	// closest before the line.
 	let block: HTMLElement | null = null;
 	let bestStart = -1;
-	const candidates = view.contentDOM.querySelectorAll<HTMLElement>(".cm-embed-block, .cm-table-widget, .cm-callout");
+	const candidates = view.contentDOM.querySelectorAll<HTMLElement>(".cm-callout, .cm-table-widget, .cm-embed-block");
 	for (const el of Array.from(candidates)) {
 		let at: number;
 		try {

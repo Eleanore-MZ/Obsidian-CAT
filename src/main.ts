@@ -12,10 +12,12 @@ import {
 } from "./highlight";
 import { CatSettings, CatSettingTab, colorVariables, DEFAULT_SETTINGS } from "./settings";
 import { PairStore } from "./store";
+import { TranslationMode } from "./translation";
 
 export default class CatPlugin extends Plugin {
 	settings: CatSettings = DEFAULT_SETTINGS;
 	store!: PairStore;
+	translation!: TranslationMode;
 	private syncTimers = new Map<string, number>();
 	/** Editors that currently show highlight decorations. */
 	private decorated = new Set<EditorView>();
@@ -27,8 +29,11 @@ export default class CatPlugin extends Plugin {
 		this.store = new PairStore(this);
 		await this.store.load();
 
+		this.translation = new TranslationMode(this);
 		this.registerCommands();
 		this.registerSyncEvents();
+		this.app.workspace.onLayoutReady(() => this.translation.syncButtons());
+		this.registerEvent(this.app.workspace.on("layout-change", () => this.translation.syncButtons()));
 		this.registerEditorExtension(highlightExtension((view, path, changed, line) => this.onCursor(view, path, changed, line)));
 
 		// Catch up on edits made while Obsidian was closed or the plugin was off.
@@ -36,6 +41,7 @@ export default class CatPlugin extends Plugin {
 	}
 
 	async onunload() {
+		this.translation?.removeButtons();
 		this.clearAll();
 		this.removeColors();
 		for (const t of this.syncTimers.values()) window.clearTimeout(t);
@@ -269,6 +275,17 @@ export default class CatPlugin extends Plugin {
 					new Notice(`CAT: paired "${view.file.basename}" with "${other.file.basename}".`);
 					this.refreshActive();
 				}
+				return true;
+			},
+		});
+
+		this.addCommand({
+			id: "translation-mode",
+			name: "Open translation mode (paired note side by side, creating one if needed)",
+			checkCallback: (checking) => {
+				const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+				if (!view?.file) return false;
+				if (!checking) void this.translation.open(view);
 				return true;
 			},
 		});

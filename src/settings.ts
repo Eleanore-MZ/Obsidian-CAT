@@ -22,6 +22,14 @@ export interface CatSettings {
 	partnerOpacity: number;
 	/** Opacity of the unpaired tint, 0 to 1. */
 	unpairedOpacity: number;
+	/** Show the translation-mode button in note headers. */
+	showTranslationButton: boolean;
+	/** Where new translation notes are created. */
+	newFileLocation: "folder" | "same" | "root";
+	/** Folder used when newFileLocation is "folder". */
+	newFileFolder: string;
+	/** File name for new translation notes; {{name}} is the source note's name. */
+	newFileName: string;
 }
 
 export const DEFAULT_SETTINGS: CatSettings = {
@@ -35,6 +43,10 @@ export const DEFAULT_SETTINGS: CatSettings = {
 	selfOpacity: 0.1,
 	partnerOpacity: 0.18,
 	unpairedOpacity: 0.12,
+	showTranslationButton: true,
+	newFileLocation: "same",
+	newFileFolder: "Translations",
+	newFileName: "{{name}} (translation)",
 };
 
 function hexToRgb(hex: string): string | null {
@@ -134,6 +146,52 @@ export class CatSettingTab extends PluginSettingTab {
 			.setDesc("Tint lines that have no partner in the paired note yet.")
 			.addToggle((t) =>
 				t.setValue(this.plugin.settings.showUnpairedMarkers).onChange((v) => this.setValues({ showUnpairedMarkers: v })),
+			);
+
+		new Setting(containerEl).setName("Translation mode").setHeading();
+
+		new Setting(containerEl)
+			.setName("Show the translation button")
+			.setDesc("Adds a button to the top right of each note that opens its paired note in a split, creating one if needed.")
+			.addToggle((t) =>
+				t.setValue(this.plugin.settings.showTranslationButton).onChange(async (v) => {
+					await this.setValues({ showTranslationButton: v });
+					this.plugin.translation.syncButtons();
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Where new translation notes go")
+			.setDesc("Used when a note has no paired note yet.")
+			.addDropdown((d) =>
+				d
+					.addOption("same", "Same folder as the source note")
+					.addOption("folder", "A dedicated folder")
+					.addOption("root", "Vault root folder")
+					.setValue(this.plugin.settings.newFileLocation)
+					.onChange((v) => this.setValues({ newFileLocation: v as CatSettings["newFileLocation"] }, true)),
+			);
+
+		if (this.plugin.settings.newFileLocation === "folder") {
+			new Setting(containerEl)
+				.setName("Dedicated folder")
+				.setDesc("Created if it does not exist.")
+				.addText((t) =>
+					t
+						.setPlaceholder("Translations")
+						.setValue(this.plugin.settings.newFileFolder)
+						.onChange((v) => this.setValues({ newFileFolder: v })),
+				);
+		}
+
+		new Setting(containerEl)
+			.setName("New note name")
+			.setDesc("{{name}} is replaced with the source note's name.")
+			.addText((t) =>
+				t
+					.setPlaceholder("{{name}} (translation)")
+					.setValue(this.plugin.settings.newFileName)
+					.onChange((v) => this.setValues({ newFileName: v })),
 			);
 
 		new Setting(containerEl).setName("Colours").setHeading();

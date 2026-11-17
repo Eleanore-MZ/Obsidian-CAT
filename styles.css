@@ -6,16 +6,51 @@ body {
 	--cat-unpaired: rgba(229, 165, 10, 0.12);
 }
 
-.markdown-source-view .cm-line.cat-hl-self {
-	background-color: var(--cat-hl-self);
+/*
+ * The tint is drawn as a translucent overlay on top of the line instead of as
+ * its background, so it stays visible over anything that paints its own
+ * background: quote lines, inline code, highlights, callouts and themes.
+ */
+.markdown-source-view .cm-line.cat-hl-self,
+.markdown-source-view .cm-line.cat-hl-partner,
+.markdown-source-view .cm-line.cat-unpaired,
+.markdown-source-view .cat-hl-rendered:not(tr) {
+	position: relative;
 }
 
-.markdown-source-view .cm-line.cat-hl-partner,
-.markdown-source-view .cat-hl-rendered {
-	background-color: var(--cat-hl-partner);
+.markdown-source-view .cm-line.cat-hl-self::after,
+.markdown-source-view .cm-line.cat-hl-partner::after,
+.markdown-source-view .cm-line.cat-unpaired::after,
+.markdown-source-view .cat-hl-rendered:not(tr)::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+	border-radius: inherit;
+	z-index: 1;
 	transition: background-color 120ms ease-out;
 }
 
-.markdown-source-view .cm-line.cat-unpaired {
+.markdown-source-view .cm-line.cat-hl-self::after {
+	background-color: var(--cat-hl-self);
+}
+
+.markdown-source-view .cm-line.cat-hl-partner::after,
+.markdown-source-view .cat-hl-rendered:not(tr)::after {
+	background-color: var(--cat-hl-partner);
+}
+
+.markdown-source-view .cm-line.cat-unpaired::after {
 	background-color: var(--cat-unpaired);
+}
+
+/* Table rows cannot hold an overlay, so tint each cell from the inside;
+   an inset shadow paints above the cell's own background. */
+.markdown-source-view tr.cat-hl-rendered > td,
+.markdown-source-view tr.cat-hl-rendered > th {
+	box-shadow: inset 0 0 0 9999px var(--cat-hl-partner);
+}
+
+.markdown-source-view .cm-callout.cat-hl-rendered::after {
+	border-radius: var(--callout-radius, 4px);
 }

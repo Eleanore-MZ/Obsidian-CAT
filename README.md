@@ -6,13 +6,14 @@ side, the line or block under your cursor is highlighted together with its count
 in the other note. Both notes may keep changing; the pairing follows the text.
 
 The plugin aims to be invisible: no ribbon icon, sidebar, or dashboard. It works through
-a few command palette entries, a settings tab, and the highlight itself. Alignment data
+a few command palette entries, one small header button, a settings tab, and the highlight
+itself. Alignment data
 is kept inside the plugin's own folder under `.obsidian`, so your Markdown stays clean
 and nothing appears in the file tree.
 
 ## Status
 
-Version 0.0.2. All four planned steps are done: unit splitting, pairing with hidden
+Version 0.0.3. All four planned steps are done: unit splitting, pairing with hidden
 alignment storage, the Live Preview highlight, and edge-case testing. There is no
 dictionary, termbase or translation memory, by design.
 
@@ -38,6 +39,9 @@ button.
 | Highlight the current line | On | Also tint the line under the cursor, not just its partner. |
 | Scroll to the corresponding block | On | Centre the partner in its pane when it is off screen. |
 | Highlight unpaired lines | Off | Tint lines that have no partner yet. |
+| Show the translation button | On | Button at the top right of each note for translation mode. |
+| Where new translation notes go | Same folder | Same folder as the source, a dedicated folder, or the vault root. |
+| New note name | `{{name}} (translation)` | `{{name}}` is the source note's name. |
 | Current line colour | Theme accent, 10% | Tint of the line under the cursor. |
 | Corresponding block colour | Theme accent, 18% | Tint of its partner in the other note. |
 | Unpaired lines colour | Amber, 12% | Tint of lines without a partner. |
@@ -69,6 +73,7 @@ palette (Ctrl+P). Each can also be given a hotkey.
 | Unpair this note | Removes the pairing and its stored alignment. |
 | Link the current line with the cursor line in the paired note | Fixes a single correspondence by hand. |
 | Jump to the corresponding line in the paired note | Moves the cursor to the partner line, opening the partner in a split if needed. |
+| Open translation mode | Opens the paired note in a split; creates and pairs a new note first if there is none. Also available as a button at the top right of each note. |
 | Show pairing status | Shows how many units are linked and how many are not. |
 
 While you write, the plugin compares each note with its last snapshot and carries every
