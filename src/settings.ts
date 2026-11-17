@@ -4,17 +4,53 @@ import type CatPlugin from "./main";
 export interface CatSettings {
 	/** Turn the corresponding-block highlight on or off. */
 	highlightEnabled: boolean;
-	/** Show a faint marker on lines that have lost their partner. */
+	/** Tint lines that have no partner yet. */
 	showUnpairedMarkers: boolean;
 	/** Scroll the partner into view when it is off screen. */
 	scrollPartner: boolean;
+	/** Colour of the line under the cursor ("" = theme accent). */
+	selfColor: string;
+	/** Colour of its partner in the other note ("" = theme accent). */
+	partnerColor: string;
+	/** Colour of unpaired lines. */
+	unpairedColor: string;
+	/** Opacity of the cursor-line tint, 0 to 1. */
+	selfOpacity: number;
+	/** Opacity of the partner tint, 0 to 1. */
+	partnerOpacity: number;
+	/** Opacity of the unpaired tint, 0 to 1. */
+	unpairedOpacity: number;
 }
 
 export const DEFAULT_SETTINGS: CatSettings = {
 	highlightEnabled: true,
 	showUnpairedMarkers: false,
 	scrollPartner: true,
+	selfColor: "",
+	partnerColor: "",
+	unpairedColor: "#e5a50a",
+	selfOpacity: 0.1,
+	partnerOpacity: 0.18,
+	unpairedOpacity: 0.12,
 };
+
+function hexToRgb(hex: string): string | null {
+	const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+	if (!m) return null;
+	const n = parseInt(m[1], 16);
+	return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+}
+
+/** CSS variable values for the current settings. */
+export function colorVariables(s: CatSettings): Record<string, string> {
+	const accent = "var(--color-accent-rgb, 124, 77, 255)";
+	const rgba = (hex: string, alpha: number, fallback: string) => `rgba(${hexToRgb(hex) ?? fallback}, ${alpha})`;
+	return {
+		"--cat-hl-self": rgba(s.selfColor, s.selfOpacity, accent),
+		"--cat-hl-partner": rgba(s.partnerColor, s.partnerOpacity, accent),
+		"--cat-unpaired": rgba(s.unpairedColor, s.unpairedOpacity, "229, 165, 10"),
+	};
+}
 
 export class CatSettingTab extends PluginSettingTab {
 	plugin: CatPlugin;
@@ -24,42 +60,77 @@ export class CatSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
+	private async setValues(patch: Partial<CatSettings>, redraw = false) {
+		Object.assign(this.plugin.settings, patch);
+		await this.plugin.saveSettings();
+		if (redraw) this.display();
+	}
+
+	/** A colour picker, an opacity slider and a reset button on one row. */
+	private colorRow(
+		name: string,
+		desc: string,
+		colorKey: "selfColor" | "partnerColor" | "unpairedColor",
+		opacityKey: "selfOpacity" | "partnerOpacity" | "unpairedOpacity",
+	) {
+		const s = this.plugin.settings;
+		const themeDefault = DEFAULT_SETTINGS[colorKey] === "";
+		const shown = s[colorKey] || (themeDefault ? this.accentHex() : DEFAULT_SETTINGS[colorKey]);
+		new Setting(this.containerEl)
+			.setName(name)
+			.setDesc(desc + (themeDefault && !s[colorKey] ? " Currently following the theme accent." : ""))
+			.addColorPicker((c) => c.setValue(shown).onChange((v) => this.setValues({ [colorKey]: v })))
+			.addSlider((sl) =>
+				sl
+					.setLimits(0.04, 0.6, 0.02)
+					.setValue(s[opacityKey])
+					.setDynamicTooltip()
+					.onChange((v) => this.setValues({ [opacityKey]: v })),
+			)
+			.addExtraButton((b) =>
+				b
+					.setIcon("rotate-ccw")
+					.setTooltip("Reset to default")
+					.onClick(() =>
+						this.setValues({ [colorKey]: DEFAULT_SETTINGS[colorKey], [opacityKey]: DEFAULT_SETTINGS[opacityKey] }, true),
+					),
+			);
+	}
+
+	private accentHex(): string {
+		const rgb = getComputedStyle(document.body).getPropertyValue("--color-accent-rgb").split(",").map((x) => parseInt(x));
+		if (rgb.length !== 3 || rgb.some((x) => isNaN(x))) return "#7c4dff";
+		return "#" + rgb.map((x) => x.toString(16).padStart(2, "0")).join("");
+	}
+
 	display(): void {
 		const { containerEl } = this;
 		containerEl.empty();
 		containerEl.createEl("p", {
-			text: "Pair two notes with the command \"Pair this note with the note in the other pane\". Highlight colours follow your theme accent and can be changed with a CSS snippet (see the README).",
+			text: 'Pair two notes with the command "Pair this note with the note in the other pane".',
 			cls: "setting-item-description",
 		});
 
 		new Setting(containerEl)
 			.setName("Highlight corresponding blocks")
 			.setDesc("Highlight the matching line or block in the paired note while editing.")
-			.addToggle((t) =>
-				t.setValue(this.plugin.settings.highlightEnabled).onChange(async (v) => {
-					this.plugin.settings.highlightEnabled = v;
-					await this.plugin.saveSettings();
-				}),
-			);
+			.addToggle((t) => t.setValue(this.plugin.settings.highlightEnabled).onChange((v) => this.setValues({ highlightEnabled: v })));
 
 		new Setting(containerEl)
 			.setName("Scroll to the corresponding block")
 			.setDesc("When the matching block is off screen, scroll the other pane so it sits in the middle.")
-			.addToggle((t) =>
-				t.setValue(this.plugin.settings.scrollPartner).onChange(async (v) => {
-					this.plugin.settings.scrollPartner = v;
-					await this.plugin.saveSettings();
-				}),
-			);
+			.addToggle((t) => t.setValue(this.plugin.settings.scrollPartner).onChange((v) => this.setValues({ scrollPartner: v })));
 
 		new Setting(containerEl)
-			.setName("Mark unpaired lines")
-			.setDesc("Show a faint bar at the left of lines that have no partner in the paired note yet.")
+			.setName("Highlight unpaired lines")
+			.setDesc("Tint lines that have no partner in the paired note yet.")
 			.addToggle((t) =>
-				t.setValue(this.plugin.settings.showUnpairedMarkers).onChange(async (v) => {
-					this.plugin.settings.showUnpairedMarkers = v;
-					await this.plugin.saveSettings();
-				}),
+				t.setValue(this.plugin.settings.showUnpairedMarkers).onChange((v) => this.setValues({ showUnpairedMarkers: v })),
 			);
+
+		new Setting(containerEl).setName("Colours").setHeading();
+		this.colorRow("Current line", "The line or block your cursor is on.", "selfColor", "selfOpacity");
+		this.colorRow("Corresponding block", "Its partner in the other note.", "partnerColor", "partnerOpacity");
+		this.colorRow("Unpaired lines", "Lines without a partner, when that option is on.", "unpairedColor", "unpairedOpacity");
 	}
 }

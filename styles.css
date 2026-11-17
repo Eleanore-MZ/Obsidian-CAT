@@ -1,9 +1,9 @@
-/* CAT Highlight. Colours follow the theme's accent and can be overridden
-   in a CSS snippet via these variables. */
+/* CAT Highlight. The colours are set from the plugin settings as CSS
+   variables on body; these are only fallbacks. */
 body {
 	--cat-hl-self: rgba(var(--color-accent-rgb, 124, 77, 255), 0.10);
 	--cat-hl-partner: rgba(var(--color-accent-rgb, 124, 77, 255), 0.18);
-	--cat-unpaired: var(--text-faint);
+	--cat-unpaired: rgba(229, 165, 10, 0.12);
 }
 
 .markdown-source-view .cm-line.cat-hl-self {
@@ -17,5 +17,5 @@ body {
 }
 
 .markdown-source-view .cm-line.cat-unpaired {
-	box-shadow: inset 2px 0 0 var(--cat-unpaired);
+	background-color: var(--cat-unpaired);
 }

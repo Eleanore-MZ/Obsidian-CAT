@@ -26,16 +26,9 @@ candidate is being composed the highlight waits for the commit, so it does not f
 Reading view is never touched. Tables and callouts that Live Preview draws as rendered
 blocks are highlighted as a block (or, for tables, the matching row).
 
-Colours follow the theme accent. To change them, add a CSS snippet (Settings,
-Appearance, CSS snippets) such as:
-
-```css
-body {
-	--cat-hl-self: rgba(255, 200, 0, 0.12);
-	--cat-hl-partner: rgba(255, 200, 0, 0.25);
-	--cat-unpaired: var(--text-error);
-}
-```
+Colours are set in the plugin settings. The current line and its partner follow the
+theme accent until you pick a colour; each colour has its own opacity slider and a reset
+button.
 
 ## Settings
 
@@ -43,7 +36,10 @@ body {
 | --- | --- | --- |
 | Highlight corresponding blocks | On | Master switch for the highlight. |
 | Scroll to the corresponding block | On | Centre the partner in its pane when it is off screen. |
-| Mark unpaired lines | Off | Faint bar at the left of lines that have no partner yet. |
+| Highlight unpaired lines | Off | Tint lines that have no partner yet. |
+| Current line colour | Theme accent, 10% | Tint of the line under the cursor. |
+| Corresponding block colour | Theme accent, 18% | Tint of its partner in the other note. |
+| Unpaired lines colour | Amber, 12% | Tint of lines without a partner. |
 
 ## Where the data lives
 

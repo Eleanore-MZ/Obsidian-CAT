@@ -10,7 +10,7 @@ import {
 	revealIfHidden,
 	setHighlight,
 } from "./highlight";
-import { CatSettings, CatSettingTab, DEFAULT_SETTINGS } from "./settings";
+import { CatSettings, CatSettingTab, colorVariables, DEFAULT_SETTINGS } from "./settings";
 import { PairStore } from "./store";
 
 export default class CatPlugin extends Plugin {
@@ -37,17 +37,31 @@ export default class CatPlugin extends Plugin {
 
 	async onunload() {
 		this.clearAll();
+		this.removeColors();
 		for (const t of this.syncTimers.values()) window.clearTimeout(t);
 		await this.store.flush();
 	}
 
 	async loadSettings() {
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		this.applyColors();
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
+		this.applyColors();
 		this.refreshActive();
+	}
+
+	/** Publishes the colour settings as CSS variables used by styles.css. */
+	private applyColors() {
+		for (const [name, value] of Object.entries(colorVariables(this.settings))) {
+			document.body.style.setProperty(name, value);
+		}
+	}
+
+	private removeColors() {
+		for (const name of Object.keys(colorVariables(this.settings))) document.body.style.removeProperty(name);
 	}
 
 	// ----- keeping alignment in step with edits -----
