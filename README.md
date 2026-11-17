@@ -116,6 +116,12 @@ Enable **CAT Highlight** under Settings, Community plugins in the test vault. If
 community "Hot Reload" plugin is installed in the vault, it reloads the plugin
 automatically after each rebuild (a `.hotreload` marker is created for it).
 
+## Releasing
+
+Bump `version` in `manifest.json` (and add it to `versions.json`), update
+`RELEASE_NOTES.md`, and push to `main`. The Release workflow builds the plugin, runs the
+tests and publishes a GitHub release named after the version, which BRAT picks up.
+
 ## Design notes
 
 Units of correspondence, given strict line breaks: each non-empty line, each heading,
